@@ -1,0 +1,7 @@
+1. Download data to data-pv - EASILY DONE
+2. Setup all the paths for data-pv in here
+    Preprocess data
+    Processed data
+3. Setup hvd in steps
+4. Build it
+5. Run on top of mpi-operator

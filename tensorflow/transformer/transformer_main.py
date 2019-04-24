@@ -41,6 +41,8 @@ from utils import dataset
 from utils import metrics
 from utils import tokenizer
 
+import horovod.tensorflow as hvd
+
 DEFAULT_TRAIN_EPOCHS = 10
 BLEU_DIR = "bleu"
 INF = 10000
@@ -120,12 +122,14 @@ def get_train_op(loss, params):
                                  value=params.optimizer_adam_beta2)
     mlperf_log.transformer_print(key=mlperf_log.OPT_HP_ADAM_EPSILON,
                                  value=params.optimizer_adam_epsilon)
+
+    # hvd OPTIMIZER
     optimizer = tf.contrib.opt.LazyAdamOptimizer(
-        learning_rate,
+        learning_rate * hvd.size(),
         beta1=params.optimizer_adam_beta1,
         beta2=params.optimizer_adam_beta2,
         epsilon=params.optimizer_adam_epsilon)
-
+    optimizer = hvd.DistributedOptimizer(optimizer)
     # Calculate and apply gradients using LazyAdamOptimizer.
     global_step = tf.train.get_global_step()
     tvars = tf.trainable_variables()
@@ -271,7 +275,10 @@ def train_schedule(
 
     # Train the model for single_iteration_train_steps or until the input fn
     # runs out of examples (if single_iteration_train_steps is None).
-    estimator.train(dataset.train_input_fn, steps=single_iteration_train_steps)
+
+    # ADD HOOKS HERE
+    hooks = [hvd.BroadcastGlobalVariablesHook(0)]
+    estimator.train(dataset.train_input_fn, steps=single_iteration_train_steps, hooks=hooks)
 
     mlperf_log.transformer_print(key=mlperf_log.EVAL_START)
     eval_results = estimator.evaluate(dataset.eval_input_fn)
@@ -342,8 +349,11 @@ def main(_):
   params.epochs_between_eval = FLAGS.epochs_between_eval
   params.repeat_dataset = single_iteration_train_epochs
 
+  # INSERT CONFIG HERE
+  config = tf.ConfigProto()
+  config.gpu_options.visible_device_list = str(hvd.local_rank())
   estimator = tf.estimator.Estimator(
-      model_fn=model_fn, model_dir=FLAGS.model_dir, params=params)
+      model_fn=model_fn, model_dir=FLAGS.model_dir, params=params, config=config)
   train_schedule(
       estimator, train_eval_iterations, single_iteration_train_steps,
       single_iteration_train_epochs, FLAGS.bleu_source, FLAGS.bleu_ref,
@@ -437,4 +447,6 @@ if __name__ == "__main__":
 
   FLAGS, unparsed = parser.parse_known_args()
 
+  # CHECK WHERE TO PUT INIT
+  hvd.init()
   tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
