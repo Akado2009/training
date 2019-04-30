@@ -27,7 +27,7 @@ spec:
       - name: kubebench-config-volume
         mountPath: /kubebench/config
   tasks:
-  - name: pre-job-1
+  - name: download-data
     container:
       name: download-dataset
       image: kirill-mlperf-download-image:latest
@@ -40,7 +40,20 @@ spec:
           timeout: 5m
         autoDelete: true
         numCopies: 1
-  - name: main-job
+  - name: preprocess-data
+      container:
+      name: preprocess-dataset
+      image: kirill-mlperf-preprocess-image:latest
+      volumeMounts:
+      - name: kubebench-data-volume
+        mountPath: /data
+      options:
+        mountManagedVolumes: true
+        autoWatch:
+          timeout: 5m
+        autoDelete: true
+        numCopies: 1
+  - name: run-training
     dependencies: [pre-job-1, pre-job-2]
     container:
       name: run-training

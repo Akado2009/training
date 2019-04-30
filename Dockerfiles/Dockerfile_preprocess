@@ -1,0 +1,7 @@
+FROM python:3
+
+ADD tensorflow/process_data.py /
+
+RUN pip install mlperf-compliance
+
+ENTRYPOINT ["python", "./process_data.py", "--data_dir", "/data", "--raw-dir", "/data/raw"]
