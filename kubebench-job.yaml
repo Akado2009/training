@@ -1,0 +1,56 @@
+apiVersion: kubeflow.org/v1alpha2
+kind: KubebenchJob
+metadata:
+  name: kubebench-job
+  namespace: default
+spec:
+  serviceAccount: default
+  volumes:
+  - name: kubebench-config-volume
+    configMap:
+      name: kubebench-config-pvc
+  - name: kubebench-data-volume
+    persistentVolumeClaim:
+      claimName: kubebench-data-pvc
+  managedVolumes:
+    experimentVolume:
+      name: kubebench-experiment-volume
+      persistentVolumeClaim:
+        claimName: kubebench-experiment-pvc
+    workflowVolume:
+      name: kubebench-workflow-volume
+      persistentVolumeClaim:
+        claimName: kubebench-workflow-pvc
+  workflowAgent:
+    container:
+      volumeMounts:
+      - name: kubebench-config-volume
+        mountPath: /kubebench/config
+  tasks:
+  - name: pre-job-1
+    container:
+      name: download-dataset
+      image: kirill-mlperf-download-image:latest
+      volumeMounts:
+      - name: kubebench-data-volume
+        mountPath: /data
+      options:
+        mountManagedVolumes: true
+        autoWatch:
+          timeout: 5m
+        autoDelete: true
+        numCopies: 1
+  - name: main-job
+    dependencies: [pre-job-1, pre-job-2]
+    container:
+      name: run-training
+      image: kirill-mlperf-training-image:latest
+      volumeMounts:
+      - name: kubebench-data-volume
+        mountPath: /data
+      options:
+        mountManagedVolumes: true
+        autoWatch:
+          timeout: 5m
+        autoDelete: true
+        numCopies: 1

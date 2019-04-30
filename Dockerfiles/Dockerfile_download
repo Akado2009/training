@@ -1,0 +1,5 @@
+FROM python:3
+
+ADD data_download.py /
+
+ENTRYPOINT ["python", "./data_download.py"]
